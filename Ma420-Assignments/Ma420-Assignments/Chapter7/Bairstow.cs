@@ -16,16 +16,16 @@ namespace Ma420_Assignments.Chapter7
 
         public struct IterationResult
         {
-            public double iterR, iterS, iterError, deltaR, deltaS;
+            public double iterR, iterS, iterRError, iterSError, deltaR, deltaS;
             public bool dataRelevant, rootFound, allRootsFound;
         }
 
-        List<IterationResult>[] iterResults; //stores the results of the iterations
-        public List<IterationResult>[] getIterationResults() { return iterResults; }
+        List<List<IterationResult>> iterResults; //stores the results of the iterations
+        public List<List<IterationResult>> getIterationResults() { return iterResults; }
 
-        int iterNum; //stores what iteration is about to be performed
+        //int iterNum; //stores what iteration is about to be performed
 
-        int overIterNum; //which set of coefficients to use for the current iteration;
+        //int overIterNum; //which set of coefficients to use for the current iteration;
 
         int foundRootCount; //how many roots have been found
 
@@ -43,11 +43,12 @@ namespace Ma420_Assignments.Chapter7
             coefficients.Add(polynomial);
             allowedError = error;
             roots = new Tuple<double, double>[polynomial.Length];
-            iterResults = new List<IterationResult>[roots.Length];
+            iterResults = new List<List<IterationResult>>();
+            iterResults.Add(new List<IterationResult>());
             maxIterNum = maxIters;
             foundRootCount = 0;
-            iterNum = 1;
-            overIterNum = 0;
+            //iterNum = 1;
+            //overIterNum = 0;
         }
 
         // Performs a single iteration over the coefficients.  Returns the results of the iteration as well as stores them in the internal list
@@ -57,14 +58,13 @@ namespace Ma420_Assignments.Chapter7
             IterationResult res = new IterationResult();
             if(roots.Length - foundRootCount >= 2) //are there 2 roots left to find?
             {
-                //if actually 2 roots left to find, perform iteration and store data in the correct list using overIterNum
-                ;
-                //if latest error is beneath allowedError, calculate roots using solveRSQuadratic and store the data the roots array as well as update necessary instance variables
-                //make sure to set res.rootFound to true;
+                //if actually 2 roots left to find, perform iteration step
+                res = performIterationStep();
             } 
             else if(roots.Length - foundRootCount == 1) //is there only one root left to find
             {
                 //if only one root left, calculate it using the subroutine solveSingle (and store it) and set dataRelevant to false
+                roots[foundRootCount++] = solveSingle(coefficients[coefficients.Count-1][0], coefficients[coefficients.Count - 1][1]);
                 res.dataRelevant = false;
                 res.rootFound = true;
             }
@@ -80,6 +80,64 @@ namespace Ma420_Assignments.Chapter7
                 res.allRootsFound = true;
             }
             return res;
+        }
+
+        private IterationResult performIterationStep()
+        {
+            IterationResult result = new IterationResult();
+
+            //set up the arrays
+            double[] aArray = coefficients[coefficients.Count - 1];
+            double[] bArray = new double[aArray.Length];
+            double[] cArray = new double[bArray.Length];
+
+            //set up the r and s variables
+            double r = 1;
+            double s = 1;
+            List<IterationResult> currSet = iterResults[iterResults.Count - 1];
+            if (currSet.Count != 0) //is there current information for this iteration set
+            {   //if so, set up the r and s using the previous specified values
+                IterationResult prev = currSet[currSet.Count - 1];//iterResults[overIterNum][iterNum - 1];
+                r = prev.iterR + prev.deltaR;
+                s = prev.iterS + prev.deltaS;
+            }
+            /*else
+            {   //set up the current iterationresults list
+                iterResults.Add(new List<IterationResult>());
+            }*/
+
+            //calculate the bArray and cArray values
+            bArray[bArray.Length - 1] = aArray[bArray.Length - 1];
+            bArray[bArray.Length - 2] = aArray[aArray.Length - 2] + r * bArray[bArray.Length - 1];
+            cArray[bArray.Length - 1] = bArray[bArray.Length - 1];
+            cArray[bArray.Length - 2] = bArray[bArray.Length - 2] + r * cArray[bArray.Length - 1];
+            for(int i = bArray.Length - 3; i >= 0; --i)
+            {
+                bArray[i] = aArray[i] + r * bArray[i + 1] + s * bArray[i + 2];
+                cArray[i] = bArray[i] + r * cArray[i + 1] + s * cArray[i + 2];
+            }
+
+            //assign some values for convenience
+            double c1 = cArray[1];
+            double c2 = cArray[2];
+            double c3 = cArray[3];
+            double b1 = bArray[1];
+            double b0 = bArray[0];
+
+            //get the deltas
+            double deltaS = 0;
+            double deltaR = 0;
+            //solve a system of two equations for deltaS and deltaR
+            //  c2 * deltaR + c3 * deltaS = -b1
+            //  c1 * deltaR + c2 * deltaS = -b0
+
+            //get the errors
+            double sErr = Math.Abs(deltaS / s);
+            double rErr = Math.Abs(deltaR / r);
+
+            //if latest error is beneath allowedError, calculate roots using solveRSQuadratic and store the data the roots array as well as update necessary instance variables
+            //make sure to set res.rootFound to true;
+            return result;
         }
 
         // Calculate a pair of roots by going through a set of iterations
@@ -105,8 +163,24 @@ namespace Ma420_Assignments.Chapter7
 
         private Tuple<Tuple<double, double>, Tuple<double,double> > solveRSQuadratic(double r, double s)
         {
-            Tuple<Tuple<double, double>, Tuple<double, double>> results = new Tuple<Tuple<double, double>, Tuple<double, double>>(new Tuple<double, double>(0,0), new Tuple<double, double>(0,0));
-
+            double discriminant = r * r + 4 * s;
+            double real1, real2, complex1, complex2;
+            if(discriminant > 0)
+            {
+                real1 = (r + Math.Sqrt(discriminant)) / 2;
+                real2 = (r - Math.Sqrt(discriminant)) / 2;
+                complex1 = 0;
+                complex2 = 0;
+            }
+            else
+            {
+                real1 = r / 2;
+                real2 = real1;
+                complex1 = Math.Sqrt(Math.Abs(discriminant)) / 2;
+                complex2 = 0 - complex1;
+            }
+            Tuple<Tuple<double, double>, Tuple<double, double>> results;
+            results = new Tuple<Tuple<double, double>, Tuple<double, double>>(new Tuple<double, double>(real1, complex1), new Tuple<double, double>(real2, complex2));
             return results;
         }
 
