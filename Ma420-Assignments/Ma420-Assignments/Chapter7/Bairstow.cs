@@ -110,11 +110,15 @@ namespace Ma420_Assignments.Chapter7
         public IterationResult performIteration()
         {
             IterationResult res = new IterationResult();
-            if(roots.Length - foundRootCount >= 2) //are there 2 roots left to find?
+            if(roots.Length - foundRootCount > 2) //are there more than 2 roots left to find?
             {
-                //if actually 2 roots left to find, perform iteration step
                 res = performIterationStep();
             } 
+            else if(roots.Length - foundRootCount == 2)
+            {
+                //if actually 2 roots left to find, perform quadratic solution
+                res = performQuadraticSolution();
+            }
             else if(roots.Length - foundRootCount == 1) //is there only one root left to find
             {
                 //if only one root left, calculate it using the subroutine solveSingle (and store it) and set dataRelevant to false
@@ -224,31 +228,151 @@ namespace Ma420_Assignments.Chapter7
                 cArray[i] = bArray[i] + r * cArray[i + 1] + s * cArray[i + 2];
             }
 
-            //assign some values for convenience
-            double c1 = cArray[1];
-            double c2 = cArray[2];
-            double c3 = cArray[3];
-            double b1 = bArray[1];
-            double b0 = bArray[0];
-
-            //get the deltas
             double deltaS = 0;
             double deltaR = 0;
-            //solve a system of two equations for deltaS and deltaR
-            //  c2 * deltaR + c3 * deltaS = -b1
-            //  c1 * deltaR + c2 * deltaS = -b0
-            //ds = ( ( -c1 * b1 / c2 ) + b0) / ( ( c1 * c3 / c2 ) - c2)
-            deltaS = (((0 - c1) * b1 / c2) + b0) / ( ( c1 * c3 / c2 ) - c2 );
-            //(-b1 - c3 * ds) / c2 = dr
-            deltaR = ((0 - b1) - c3 * deltaS) / c2;
+            {
+                int count = currSet.Count;
+
+                int bob = 1;
+
+                //assign some values for convenience
+                double c1 = cArray[1];
+                double c2 = cArray[2];
+                double c3 = cArray[3];
+                double b1 = bArray[1];
+                double b0 = bArray[0];
+                //solve a system of two equations for deltaS and deltaR
+                //  c2 * deltaR + c3 * deltaS = -b1
+                //  c1 * deltaR + c2 * deltaS = -b0
+
+                //bad solution that involved maybe dividing by 0
+                //ds = ( ( -c1 * b1 / c2 ) + b0) / ( ( c1 * c3 / c2 ) - c2)
+                //deltaS = (((0 - c1) * b1 / c2) + b0) / ( ( c1 * c3 / c2 ) - c2 );
+                //(-b1 - c3 * ds) / c2 = dr
+                //deltaR = ((0 - b1) - c3 * deltaS) / c2;
+                //here we go matrices
+                double one_one, one_two, one_three, two_one, two_two, two_three, store_meh;
+                one_one = c2;
+                one_two = c3;
+                one_three = -b1;
+                two_one = c1;
+                two_two = c2;
+                two_three = -b0;
+                //[c2   c3  -b1]
+                //[c1   c2  -b0]
+
+                //from here on out, whenever i use num1 or num2 or num3 or .. in a matrix, i'm just referring to some number, not a specific number from a previous statement
+                //when i use a numX in an english statement, assume im referring to the diagram directly above
+
+                //add the bottom row to the top and the top to the bottom in hopes of getting rid of all 0s
+                //add the bottom row to the top
+                {
+                    bool good = false;
+                    double temp_one = 0, temp_two = 0, temp_three = 0, mult = 1;
+                    while (!good) {
+                        temp_one = one_one + two_one * mult;
+                        temp_two = one_two + two_two * mult;
+                        temp_three = one_three + two_three * mult;
+                        good = (temp_one != 0) && (temp_two != 0);
+                        ++mult;
+                    }
+                    one_one = temp_one;
+                    one_two = temp_two;
+                    one_three = temp_three;
+
+                    good = false;
+                    mult = 0;
+                    while (!good)
+                    {
+                        temp_one = one_one * mult + two_one;
+                        temp_two = one_two * mult + two_two;
+                        temp_three = one_three * mult + two_three;
+                        good = (temp_one != 0) && (temp_two != 0);
+                        ++mult;
+                    }
+                    two_one = temp_one;
+                    two_two = temp_two;
+                    two_three = temp_three;
+                }
+                /*
+                one_one += two_one;
+                one_two += two_two;
+                one_three += two_three;
+                //add the top row to the bottom
+                two_one += one_one;
+                two_two += one_two;
+                two_three += one_three;
+                */
+
+                //hopefully, every cell has something in it (otherwise I may be screwed...)
+                //store one_one and divide that row by it to get
+                //[1    num1    num2]
+                store_meh = one_one;
+                one_one = one_one / store_meh;
+                one_two = one_two / store_meh;
+                one_three = one_three / store_meh;
+
+                //current state is below
+                //[1    num1    num2]
+                //[num3 num4    num5]
+
+                //subtract num3 from num 3, num1 * num 3 from num4, and num2 * num3 from num5
+                //yields a bottom row of
+                //[0    num1    num2]
+                store_meh = two_one;
+                two_one = 0;
+                two_two -= (store_meh * one_two);
+                two_three -= (store_meh * one_three);
+
+                //current state is below
+                //[1    num1    num2]
+                //[0    num3    num4]
+
+                //divide num3 by num3 to get 1 and num4 by num3
+                //yields a bottom row of
+                //[0    1   num1]
+                store_meh = two_two;
+                two_two = 1;
+                two_three = two_three / store_meh;
+
+                //current state is below
+                //[1    num1    num2]
+                //[0    1       num3]
+
+                //subtract num1 from itself and subtract (num3 * num1) from num2
+                //yields a top row of
+                //[1    0       num1]
+
+                store_meh = one_two;
+                one_two = 0;
+                one_three -= (store_meh * two_three);
+
+                //current (and final) state is
+                //[1    0   num1]
+                //[0    1   num2]
+
+                //so, deltaR = num1 and deltaS = num2
+                deltaR = one_three;
+                deltaS = two_three;
+            }
 
             //get the errors
-            double sErr = Math.Abs(deltaS / s);
-            double rErr = Math.Abs(deltaR / r);
+            double sErr = (s != 0) ? Math.Abs(deltaS / s) : (deltaS != 0) ? 1 : 0;
+            double rErr = (r != 0) ? Math.Abs(deltaR / r) : (deltaR != 0) ? 1 : 0;
+
+            //assign all the relevant data
+            result.iterR = r;
+            result.iterS = s;
+            result.iterRError = rErr;
+            result.iterSError = sErr;
+            result.deltaR = deltaR;
+            result.deltaS = deltaS;
+
+            
 
             //if latest error is beneath allowedError, calculate roots using solveRSQuadratic and store the data the roots array as well as update necessary instance variables
             //make sure to set res.rootFound to true;
-            if(sErr < allowedError && rErr < allowedError)
+            if (sErr < allowedError && rErr < allowedError)
             {
                 result.rootFound = true; //make sure the result knows it found a root
 
@@ -276,16 +400,31 @@ namespace Ma420_Assignments.Chapter7
                     result.allRootsFound = true;
                 }
             }
+            if (!result.rootFound)
+                iterResults[iterResults.Count - 1].Add(result);
+            else
+                iterResults[iterResults.Count - 2].Add(result);
 
-            //assign all the relevant data
-            result.iterR = r;
-            result.iterS = s;
-            result.iterRError = rErr;
-            result.iterSError = sErr;
-            result.deltaR = deltaR;
-            result.deltaS = deltaS;
+            return result;
+        }
 
-            iterResults[iterResults.Count - 1].Add(result);
+        private IterationResult performQuadraticSolution()
+        {
+            IterationResult result = new IterationResult();
+            result.dataRelevant = false;
+            result.rootFound = true;
+
+            double[] currentEq = coefficients[coefficients.Count - 1];
+
+            //solve for the roots and assign them
+            Tuple<Tuple<double, double>, Tuple<double, double>> rootPair = solveNormalQuadratic(currentEq[2], currentEq[1], currentEq[0]);
+            roots[foundRootCount++] = rootPair.Item1;
+            roots[foundRootCount++] = rootPair.Item2;
+
+            if(roots.Length - foundRootCount == 0)
+            {
+                result.allRootsFound = true;
+            }
             return result;
         }
 
@@ -305,6 +444,29 @@ namespace Ma420_Assignments.Chapter7
                 real1 = r / 2;
                 real2 = real1;
                 complex1 = Math.Sqrt(Math.Abs(discriminant)) / 2;
+                complex2 = 0 - complex1;
+            }
+            Tuple<Tuple<double, double>, Tuple<double, double>> results;
+            results = new Tuple<Tuple<double, double>, Tuple<double, double>>(new Tuple<double, double>(real1, complex1), new Tuple<double, double>(real2, complex2));
+            return results;
+        }
+
+        private Tuple<Tuple<double, double>, Tuple<double,double>> solveNormalQuadratic(double a, double b, double c)
+        {
+            double discriminant = b * b - 4 * a * c;
+            double real1, real2, complex1, complex2;
+            if(discriminant > 0)
+            {
+                real1 = (b + Math.Sqrt(discriminant)) / (2 * a);
+                real2 = (b - Math.Sqrt(discriminant)) / (2 * a);
+                complex1 = 0;
+                complex2 = 0;
+            }
+            else
+            {
+                real1 = b / (2 * a);
+                real2 = real1;
+                complex1 = Math.Sqrt(Math.Abs(discriminant)) / (2 * a);
                 complex2 = 0 - complex1;
             }
             Tuple<Tuple<double, double>, Tuple<double, double>> results;
