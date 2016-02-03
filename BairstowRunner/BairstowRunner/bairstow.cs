@@ -26,6 +26,7 @@ namespace Ma420_Assignments.Chapter7
 
         int maxIterNum; //the max number of iterations to perform before giving up
 
+        //stores necessary information resulting from a single "performIteration" operation
         public struct IterationResult
         {
             public double iterR, iterS, iterRError, iterSError, deltaR, deltaS;
@@ -35,9 +36,20 @@ namespace Ma420_Assignments.Chapter7
         List<List<IterationResult>> iterResults; //stores the results of the iterations
         public List<List<IterationResult>> getIterationResults() { return iterResults; }
 
-        //int iterNum; //stores what iteration is about to be performed
-
-        //int overIterNum; //which set of coefficients to use for the current iteration;
+        //returns the most recent, nonempty set of iterations (or null if none exists)
+        public List<IterationResult> getLatestIterations()
+        {
+            List<IterationResult> results = null;
+            if (iterResults.Count > 1)
+            {
+                if (iterResults[iterResults.Count - 1].Count > 0)
+                    results = iterResults[iterResults.Count - 1];
+                else
+                    results = iterResults[iterResults.Count - 2];
+            }
+            else if (iterResults[0].Count > 0) results = iterResults[0];
+            return results;
+        }
 
         int foundRootCount; //how many roots have been found
 
@@ -99,8 +111,6 @@ namespace Ma420_Assignments.Chapter7
             iterResults.Add(new List<IterationResult>());
             maxIterNum = maxIters;
             foundRootCount = 0;
-            //iterNum = 1;
-            //overIterNum = 0;
             startR = r;
             startS = s;
         }
@@ -110,16 +120,17 @@ namespace Ma420_Assignments.Chapter7
         public IterationResult performIteration()
         {
             IterationResult res = new IterationResult();
-            if(roots.Length - foundRootCount > 2) //are there more than 2 roots left to find?
+            if(roots.Length - foundRootCount > 2)
             {
+                //if there are more than two roots left to find, perform a generic iteration step
                 res = performIterationStep();
             } 
             else if(roots.Length - foundRootCount == 2)
             {
-                //if actually 2 roots left to find, perform quadratic solution
+                //if there are exactly 2 roots left to find, perform quadratic solution
                 res = performQuadraticSolution();
             }
-            else if(roots.Length - foundRootCount == 1) //is there only one root left to find
+            else if(roots.Length - foundRootCount == 1)
             {
                 //if only one root left, calculate it using the subroutine solveSingle (and store it) and set dataRelevant to false
                 roots[foundRootCount++] = solveSingle(coefficients[coefficients.Count-1][0], coefficients[coefficients.Count - 1][1]);
@@ -145,7 +156,7 @@ namespace Ma420_Assignments.Chapter7
         // If there is only a single root, it will be stored in Item1 and Item2 will be null
         public Tuple<Tuple<double, double>, Tuple<double, double>> calculateRootPair()
         {
-            Tuple<Tuple<double, double>, Tuple<double, double>> results;// = new Tuple<Tuple<double, double>, Tuple<double, double>>(new Tuple<double, double>(0, 0), new Tuple<double, double>(0, 0));
+            Tuple<Tuple<double, double>, Tuple<double, double>> results;
             if (roots.Length - foundRootCount > 0) //are we done yet?
             {   //guess not, so we need to find the next pair of roots
                 //basically, call performIteration() until the result has rootFound set to true
@@ -158,7 +169,7 @@ namespace Ma420_Assignments.Chapter7
 
             //return the last 2 or (if there is only 1) 1 root
             if (roots.Length > 1)
-                results = new Tuple<Tuple<double, double>, Tuple<double, double>>(roots[roots.Length - 2], roots[roots.Length - 1]);
+                results = new Tuple<Tuple<double, double>, Tuple<double, double>>(roots[foundRootCount - 2], roots[foundRootCount - 1]);
             else
                 results = new Tuple<Tuple<double, double>, Tuple<double, double>>(new Tuple<double, double>(0, 0), roots[roots.Length - 1]);
             
@@ -183,6 +194,7 @@ namespace Ma420_Assignments.Chapter7
 
         //PRIVATE METHOD DEFINITIONS
 
+        //This performs a single, actual iteration of Bairstow's method
         private IterationResult performIterationStep()
         {
             IterationResult result = new IterationResult();
@@ -228,6 +240,7 @@ namespace Ma420_Assignments.Chapter7
                 cArray[i] = bArray[i] + r * cArray[i + 1] + s * cArray[i + 2];
             }
 
+            //calculate the deltas for the next iteration
             double deltaS = 0;
             double deltaR = 0;
             {
@@ -241,6 +254,7 @@ namespace Ma420_Assignments.Chapter7
                 double c3 = cArray[3];
                 double b1 = bArray[1];
                 double b0 = bArray[0];
+
                 //solve a system of two equations for deltaS and deltaR
                 //  c2 * deltaR + c3 * deltaS = -b1
                 //  c1 * deltaR + c2 * deltaS = -b0
@@ -250,6 +264,7 @@ namespace Ma420_Assignments.Chapter7
                 //deltaS = (((0 - c1) * b1 / c2) + b0) / ( ( c1 * c3 / c2 ) - c2 );
                 //(-b1 - c3 * ds) / c2 = dr
                 //deltaR = ((0 - b1) - c3 * deltaS) / c2;
+
                 //here we go matrices
                 double one_one, one_two, one_three, two_one, two_two, two_three, store_meh;
                 one_one = c2;
@@ -258,22 +273,28 @@ namespace Ma420_Assignments.Chapter7
                 two_one = c1;
                 two_two = c2;
                 two_three = -b0;
+
+                //Current state of the matrix
                 //[c2   c3  -b1]
                 //[c1   c2  -b0]
+                //
+                //[1-1      1-2     1-3]
+                //[2-1      2-2     2-3]
 
-                //from here on out, whenever i use num1 or num2 or num3 or .. in a matrix, i'm just referring to some number, not a specific number from a previous statement
+                //from here on out, whenever i use num1 or num2 or num3 or .. in a matrix, i'm just referring to some number, not a specific number from a previous diagram
                 //when i use a numX in an english statement, assume im referring to the diagram directly above
 
                 //add the bottom row to the top and the top to the bottom in hopes of getting rid of all 0s
-                //add the bottom row to the top
                 {
                     bool good = false;
                     double temp_one = 0, temp_two = 0, temp_three = 0, mult = 1;
+
+                    //add some multiple of the bottom row to the top
                     while (!good) {
                         temp_one = one_one + two_one * mult;
                         temp_two = one_two + two_two * mult;
                         temp_three = one_three + two_three * mult;
-                        good = (temp_one != 0) && (temp_two != 0);
+                        good = (temp_one != 0) && (temp_two != 0); //make sure neither of the important two are 0
                         ++mult;
                     }
                     one_one = temp_one;
@@ -281,20 +302,23 @@ namespace Ma420_Assignments.Chapter7
                     one_three = temp_three;
 
                     good = false;
-                    mult = 0;
+                    mult = 0; //because we may not have to actually add anything to make the bottom happy
+                    //add some multiple of the top row to the bottom
                     while (!good)
                     {
                         temp_one = one_one * mult + two_one;
                         temp_two = one_two * mult + two_two;
                         temp_three = one_three * mult + two_three;
-                        good = (temp_one != 0) && (temp_two != 0);
+                        good = (temp_one != 0) && (temp_two != 0); //make sure neither of the important two are 0
                         ++mult;
                     }
                     two_one = temp_one;
                     two_two = temp_two;
                     two_three = temp_three;
                 }
+
                 /*
+                //old, bad code for the above code
                 one_one += two_one;
                 one_two += two_two;
                 one_three += two_three;
@@ -357,8 +381,10 @@ namespace Ma420_Assignments.Chapter7
             }
 
             //get the errors
-            double sErr = (s != 0) ? Math.Abs(deltaS / s) : (deltaS != 0) ? 1 : 0;
-            double rErr = (r != 0) ? Math.Abs(deltaR / r) : (deltaR != 0) ? 1 : 0;
+            double sErr = /*make sure s isn't zero*/(s != 0) ? Math.Abs(deltaS / s) 
+                : (deltaS != 0) ? 1 : 0; //if s is zero and deltaS isn't, error should be 100%, otherwise we apparently nailed it head on
+            double rErr = /*make sure r isn't zero*/(r != 0) ? Math.Abs(deltaR / r) 
+                : (deltaR != 0) ? 1 : 0; //if r is zero and deltaR isn't, error should be 100%, otherwise we apparently nailed it head on
 
             //assign all the relevant data
             result.iterR = r;
@@ -387,7 +413,7 @@ namespace Ma420_Assignments.Chapter7
                     iterResults.Add(new List<IterationResult>());
 
                     //calculate / assign the next set of coefficients
-                    //supposedly, the next set of coefficients belong in b
+                    //supposedly, the next set of coefficients already reside in bArray
                     double[] nextSet = new double[aArray.Length - 2];
                     for(int i = 0; i < nextSet.Length; ++i)
                     {
@@ -400,6 +426,8 @@ namespace Ma420_Assignments.Chapter7
                     result.allRootsFound = true;
                 }
             }
+
+            //make sure to add the results to the correct iteration set
             if (!result.rootFound)
                 iterResults[iterResults.Count - 1].Add(result);
             else
@@ -408,6 +436,8 @@ namespace Ma420_Assignments.Chapter7
             return result;
         }
 
+        //solves a (normal, not r/s) quadratic equation and stores the results in the roots table
+        //this only happens if either the user submitted a quadratic to be solved or the highest power of x is even
         private IterationResult performQuadraticSolution()
         {
             IterationResult result = new IterationResult();
@@ -428,6 +458,8 @@ namespace Ma420_Assignments.Chapter7
             return result;
         }
 
+        //solves a quadratic of the form 0 = x^2 + rx + s and returns its roots
+        //is its own thing because reasons
         private Tuple<Tuple<double, double>, Tuple<double,double> > solveRSQuadratic(double r, double s)
         {
             double discriminant = r * r + 4 * s;
@@ -451,6 +483,8 @@ namespace Ma420_Assignments.Chapter7
             return results;
         }
 
+        //solves a normal quadratic of the form 0 = ax^2 + bx + c and returns its roots
+        //is its own thing because reasons
         private Tuple<Tuple<double, double>, Tuple<double,double>> solveNormalQuadratic(double a, double b, double c)
         {
             double discriminant = b * b - 4 * a * c;
@@ -474,6 +508,7 @@ namespace Ma420_Assignments.Chapter7
             return results;
         }
 
+        //solves a single, linear equation of the form 0 = a(1)x + a(0) and returns its root / solution
         private Tuple<double, double> solveSingle(double a0, double a1)
         {
             return new Tuple<double, double>((0 - a0) / a1, 0);
